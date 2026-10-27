@@ -1,0 +1,22 @@
+
+# Environment variables and API keys
+.env
+.env.*
+
+# Python virtual environment
+venv/
+.venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+
+# Django local files
+db.sqlite3
+media/
+
+# IDE and operating system files
+.vscode/
+.idea/
+.DS_Store

@@ -1,0 +1,97 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard | Smart Study Companion</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'assistant/style.css' %}">
+</head>
+<body class="app-page">
+    <div class="container app-shell py-4 py-lg-5">
+        <header class="app-header dashboard-header mb-4 mb-lg-5">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div class="brand-lockup">
+                    <div class="brand-icon" aria-hidden="true">📊</div>
+                    <div>
+                        <span class="header-eyebrow">YOUR PERSONAL DASHBOARD</span>
+                        <h1 class="fw-bold mb-0">Welcome, {{ account_name }}</h1>
+                    </div>
+                </div>
+                <div class="dashboard-actions">
+                    <a class="btn btn-outline-primary" href="{% url 'question_bank' %}">Question Bank</a>
+                    <a class="btn btn-primary" href="{% url 'index' %}">Start studying</a>
+                    <form method="POST" action="{% url 'logout' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-secondary">Log out</button>
+                    </form>
+                </div>
+            </div>
+            <p class="header-description mb-0">See your learning activity, quiz progress, and the topics you have been exploring.</p>
+        </header>
+
+        <main>
+            <section class="dashboard-stat-grid mb-4" aria-label="Study summary">
+                <article class="dashboard-stat-card stat-purple"><span class="stat-icon">📚</span><small>Study sessions</small><strong>{{ total_sessions }}</strong><span>saved activities</span></article>
+                <article class="dashboard-stat-card stat-orange streak-stat-card"><span class="stat-icon" aria-hidden="true">🔥</span><small>Current streak</small><strong>{{ current_streak }} day{{ current_streak|pluralize }}</strong><span>Best: {{ longest_streak }} day{{ longest_streak|pluralize }}</span></article>
+                <article class="dashboard-stat-card stat-blue"><span class="stat-icon">🧠</span><small>Quizzes completed</small><strong>{{ quiz_count }}</strong><span>practice attempts</span></article>
+                <article class="dashboard-stat-card stat-green"><span class="stat-icon">🎯</span><small>Average score</small><strong>{{ average_score }}%</strong><span>across all questions</span></article>
+                <article class="dashboard-stat-card stat-orange"><span class="stat-icon">⭐</span><small>Bookmarks</small><strong>{{ bookmarks_count }}</strong><span>saved for revision</span></article>
+                <article class="dashboard-stat-card stat-blue bank-stat-card"><span class="stat-icon">🗃️</span><small>Question bank</small><strong>{{ question_bank_count }}</strong><span>saved practice questions</span></article>
+            </section>
+
+            <section class="adaptive-banner mb-4">
+                <div>
+                    <span class="section-eyebrow">ADAPTIVE LEARNING</span>
+                    <h2>Your next adaptive quiz: {{ next_difficulty|title }}</h2>
+                    <p>{{ adaptive_hint }}</p>
+                </div>
+                <a href="{% url 'index' %}" class="btn btn-primary">Practice now</a>
+            </section>
+
+            <div class="row g-4">
+                <div class="col-lg-7">
+                    <section class="card dashboard-panel h-100">
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-between align-items-start gap-3 mb-3">
+                                <div><span class="section-eyebrow">LAST SEVEN DAYS</span><h2>Study activity</h2></div>
+                                <span class="dashboard-total">{{ total_questions }} questions answered</span>
+                            </div>
+                            <div class="activity-chart" aria-label="Study sessions over the last seven days">
+                                {% for day in recent_days %}
+                                    <div class="activity-day">
+                                        <div class="activity-bar-track"><div class="activity-bar" style="height: {{ day.percent }}%" title="{{ day.count }} session{{ day.count|pluralize }} on {{ day.date }}"></div></div>
+                                        <strong>{{ day.count }}</strong><small>{{ day.label }}</small>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </section>
+                </div>
+                <div class="col-lg-5">
+                    <section class="card dashboard-panel h-100">
+                        <div class="card-body p-4">
+                            <span class="section-eyebrow">YOUR FOCUS</span><h2>Top topics</h2>
+                            {% if top_topics %}
+                                <ol class="topic-rank-list">
+                                    {% for topic, count in top_topics %}<li><span class="topic-rank">{{ forloop.counter }}</span><span class="text-truncate">{{ topic }}</span><strong>{{ count }}</strong></li>{% endfor %}
+                                </ol>
+                            {% else %}<p class="text-muted mb-0">Your most studied topics will appear here.</p>{% endif %}
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <section class="card dashboard-panel mt-4">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center gap-3 mb-3"><div><span class="section-eyebrow">RECENT ACTIVITY</span><h2>Keep your momentum going</h2></div><a href="{% url 'index' %}" class="btn btn-sm btn-outline-primary">Open study tools</a></div>
+                    {% if recent_sessions %}
+                        <div class="table-responsive"><table class="table dashboard-table align-middle mb-0"><thead><tr><th>Activity</th><th>Topic</th><th>Date</th></tr></thead><tbody>{% for session in recent_sessions %}<tr><td><span class="activity-type-dot"></span>{{ session.get_task_type_display }}</td><td class="text-muted text-truncate dashboard-topic">{{ session.user_input|default:"Untitled session"|truncatechars:72 }}</td><td class="text-muted">{{ session.created_at|date:"M d, Y H:i" }}</td></tr>{% endfor %}</tbody></table></div>
+                    {% else %}<div class="empty-dashboard"><span>🌱</span><p>No recent sessions to show. Your dashboard totals still include earlier activity.</p><a href="{% url 'index' %}" class="btn btn-primary">Start your first session</a></div>{% endif %}
+                </div>
+            </section>
+        </main>
+    </div>
+</body>
+</html>

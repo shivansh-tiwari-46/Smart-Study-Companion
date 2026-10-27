@@ -1,0 +1,559 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Study Companion</title>
+
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{% static 'assistant/style.css' %}">
+</head>
+<body class="app-page">
+    <div class="container app-shell py-4 py-lg-5">
+        <header class="app-header mb-4 mb-lg-5">
+            <div class="brand-lockup">
+                <div class="brand-icon" aria-hidden="true">🎓</div>
+                <div>
+                    <span class="header-eyebrow">YOUR PERSONAL LEARNING SPACE</span>
+                    <h1 class="fw-bold mb-0">Smart Study Companion</h1>
+                </div>
+            </div>
+            <p class="header-description">
+                Turn any topic into clear explanations, quick practice, and a study plan that works for you.
+            </p>
+            <div class="header-highlights" aria-label="Available study tools">
+                <span>✨ Clear explanations</span>
+                <span>🧠 Interactive quizzes</span>
+                <span>🌈 Colorful topic cards</span>
+            </div>
+            <div class="account-bar" aria-label="Account controls">
+                <span>Signed in as <strong>{{ account_name }}</strong></span>
+                <div class="account-actions">
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'dashboard' %}">Dashboard</a>
+                    <a class="btn btn-sm btn-outline-primary" href="{% url 'question_bank' %}">Question Bank</a>
+                    <form method="POST" action="{% url 'logout' %}">
+                    {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">Log out</button>
+                    </form>
+                </div>
+            </div>
+        </header>
+
+        <div class="row g-4">
+            <main class="col-lg-8 app-main">
+                <!-- Study material input and tool-specific settings -->
+                <section class="card study-composer mb-4">
+                    <div class="card-body p-4 p-lg-5">
+                        <div class="composer-intro">
+                            <span class="section-eyebrow">START A STUDY SESSION</span>
+                            <h2>What are you learning today?</h2>
+                            <p>Choose a tool, add your material, and let’s make it easier to remember.</p>
+                        </div>
+                        <form method="POST" enctype="multipart/form-data" id="study-form">
+                            {% csrf_token %}
+
+                            <div class="mb-3">
+                                <label for="user_input" class="form-label fw-bold">
+                                    Study material or topic
+                                </label>
+                                <textarea class="form-control" id="user_input" name="user_input" rows="4" placeholder="Paste notes, a topic, or study text">{{ user_input }}</textarea>
+                                <div class="voice-control-row">
+                                    <button type="button" class="btn btn-outline-primary btn-sm" id="voice-input-button" aria-pressed="false">
+                                        🎙️ Speak your prompt
+                                    </button>
+                                    <span id="voice-input-status" class="voice-status" role="status" aria-live="polite"></span>
+                                </div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="pdf_file" class="form-label fw-bold">
+                                    Or upload PDF study notes
+                                </label>
+                                <input
+                                    class="form-control"
+                                    type="file"
+                                    id="pdf_file"
+                                    name="pdf_file"
+                                    accept=".pdf,application/pdf"
+                                >
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="task_type" class="form-label fw-bold">
+                                    Choose a study tool
+                                </label>
+                                <select class="form-select" id="task_type" name="task_type">
+                                    <option value="explain" {% if task_type == "explain" %}selected{% endif %}>
+                                        Explain Concept
+                                    </option>
+                                    <option value="summarize" {% if task_type == "summarize" %}selected{% endif %}>
+                                        Summarize Text / PDF
+                                    </option>
+                                    <option value="quiz" {% if task_type == "quiz" %}selected{% endif %}>
+                                        Interactive Quiz
+                                    </option>
+                                    <option value="flashcards" {% if task_type == "flashcards" %}selected{% endif %}>
+                                        Flashcards
+                                    </option>
+                                    <option value="study_plan" {% if task_type == "study_plan" %}selected{% endif %}>
+                                        Study Plan
+                                    </option>
+                                    <option value="topic_cards" {% if task_type == "topic_cards" %}selected{% endif %}>
+                                        Topic Cards
+                                    </option>
+                                </select>
+                            </div>
+
+                            <div
+                                class="task-settings mb-3"
+                                data-for="quiz flashcards"
+                                {% if task_type != "quiz" and task_type != "flashcards" %}hidden{% endif %}
+                            >
+                                <label for="topic_focus" class="form-label fw-semibold">
+                                    Focus on a chapter or concept (optional)
+                                </label>
+                                <input
+                                    class="form-control"
+                                    id="topic_focus"
+                                    name="topic_focus"
+                                    value="{{ topic_focus }}"
+                                    placeholder="e.g., process scheduling"
+                                >
+                            </div>
+
+                            <div
+                                class="task-settings mb-3"
+                                data-for="quiz"
+                                {% if task_type != "quiz" %}hidden{% endif %}
+                            >
+                                <div class="mb-3">
+                                    <label for="quiz_subject" class="form-label fw-semibold">Subject or course (optional)</label>
+                                    <input class="form-control" id="quiz_subject" name="quiz_subject" value="{{ quiz_subject }}" maxlength="120" placeholder="e.g., Computer Networks">
+                                    <div class="form-text">This helps organize saved questions in your bank.</div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-sm-6">
+                                        <label for="difficulty" class="form-label fw-semibold">
+                                            Difficulty
+                                        </label>
+                                        <select class="form-select" id="difficulty" name="difficulty">
+                                            <option value="adaptive" {% if difficulty_mode == "adaptive" %}selected{% endif %}>
+                                                Adaptive (recommended)
+                                            </option>
+                                            <option value="easy" {% if difficulty_mode == "easy" %}selected{% endif %}>
+                                                Easy
+                                            </option>
+                                            <option value="medium" {% if difficulty_mode == "medium" %}selected{% endif %}>
+                                                Medium
+                                            </option>
+                                            <option value="hard" {% if difficulty_mode == "hard" %}selected{% endif %}>
+                                                Hard
+                                            </option>
+                                        </select>
+                                        <div class="form-text">{{ difficulty_hint }}</div>
+                                    </div>
+
+                                    <div class="col-sm-6">
+                                        <label for="question_count" class="form-label fw-semibold">
+                                            Number of questions
+                                        </label>
+                                        <input
+                                            class="form-control"
+                                            type="number"
+                                            min="1"
+                                            max="10"
+                                            id="question_count"
+                                            name="question_count"
+                                            value="{{ question_count }}"
+                                        >
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div
+                                class="task-settings mb-3"
+                                data-for="topic_cards"
+                                {% if task_type != "topic_cards" %}hidden{% endif %}
+                            >
+                                <label for="topic_cards_topic" class="form-label fw-semibold">
+                                    Topic for colorful concept cards
+                                </label>
+                                <input
+                                    class="form-control"
+                                    id="topic_cards_topic"
+                                    name="topic_cards_topic"
+                                    value="{{ topic_cards_topic }}"
+                                    placeholder="e.g., Photosynthesis, HTTP, or World War II"
+                                >
+                                <div class="form-text">Short cards will cover the topic from the big idea to practical details.</div>
+                            </div>
+
+                            <div
+                                class="task-settings mb-3"
+                                data-for="study_plan"
+                                {% if task_type != "study_plan" %}hidden{% endif %}
+                            >
+                                <label for="study_topics" class="form-label fw-semibold">
+                                    Topics to cover
+                                </label>
+                                <textarea class="form-control mb-3" id="study_topics" name="study_topics" rows="2" placeholder="List chapters or topics">{{ study_topics }}</textarea>
+
+                                <label for="exam_date" class="form-label fw-semibold">
+                                    Exam date
+                                </label>
+                                <input
+                                    class="form-control"
+                                    type="date"
+                                    id="exam_date"
+                                    name="exam_date"
+                                    value="{{ exam_date }}"
+                                >
+                            </div>
+
+                            <button type="submit" class="btn btn-primary w-100 py-2 fw-bold">
+                                ✨ Create Study Material
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                {% if error_message %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ error_message }}
+                    </div>
+                {% endif %}
+
+                <!-- Quiz output and interactive quiz container -->
+                {% if quiz_data %}
+                    {{ quiz_data|json_script:"quiz-data" }}
+                    <section class="card output-card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white fw-bold d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                            <span>🧠 Interactive Quiz</span>
+                            <span class="quiz-level-badge">{% if difficulty_mode == "adaptive" %}Adaptive · {% endif %}{{ difficulty|title }}</span>
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-end gap-2 mb-3 export-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger btn-sm export-button"
+                                    data-format="pdf"
+                                >
+                                    Download PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm export-button"
+                                    data-format="docx"
+                                >
+                                    Download Word
+                                </button>
+                            </div>
+                            <div
+                                id="quiz-container"
+                                data-session-id="{{ quiz_session_id }}"
+                                data-difficulty="{{ difficulty }}"
+                                data-subject="{{ quiz_subject|default:'General' }}"
+                                data-topic="{{ quiz_bank_topic }}"
+                                data-adaptive="{% if difficulty_mode == 'adaptive' %}true{% else %}false{% endif %}"
+                                aria-live="polite"
+                            ></div>
+                        </div>
+                    </section>
+                {% endif %}
+
+                <!-- Flashcard output and interactive card container -->
+                {% if flashcards_data %}
+                    {{ flashcards_data|json_script:"flashcards-data" }}
+                    <section class="card output-card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white fw-bold">
+                            🗂️ Study Flashcards
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-end gap-2 mb-3 export-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger btn-sm export-button"
+                                    data-format="pdf"
+                                >
+                                    Download PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm export-button"
+                                    data-format="docx"
+                                >
+                                    Download Word
+                                </button>
+                            </div>
+                            <div id="flashcard-container" aria-live="polite"></div>
+                        </div>
+                    </section>
+                {% endif %}
+
+                <!-- Colorful topic concept cards -->
+                {% if topic_cards_data %}
+                    {{ topic_cards_data|json_script:"topic-cards-data" }}
+                    <section class="card output-card topic-cards-panel shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white fw-bold">
+                            🌈 Topic Cards
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-end gap-2 mb-3 export-actions">
+                                <button type="button" class="btn btn-outline-danger btn-sm export-button" data-format="pdf">
+                                    Download PDF
+                                </button>
+                                <button type="button" class="btn btn-outline-primary btn-sm export-button" data-format="docx">
+                                    Download Word
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm bookmark-button" data-kind="note" data-title="Topic cards">
+                                    ☆ Bookmark Cards
+                                </button>
+                            </div>
+                            <div id="topic-cards-container" class="topic-cards-grid" aria-live="polite"></div>
+                        </div>
+                    </section>
+                {% endif %}
+
+                <!-- Generated study plan -->
+                {% if plan_data %}
+                    {{ plan_data|json_script:"plan-data" }}
+                    <section class="card output-card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white fw-bold">
+                            🗓️ Your Study Plan
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="rich-text mb-3">{{ plan_data.overview }}</div>
+
+                            <div class="d-flex justify-content-end gap-2 mb-3 export-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger btn-sm export-button"
+                                    data-format="pdf"
+                                >
+                                    Download PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm export-button"
+                                    data-format="docx"
+                                >
+                                    Download Word
+                                </button>
+                            </div>
+
+                            <div class="list-group">
+                                {% for item in plan_data.schedule %}
+                                    <div class="list-group-item">
+                                        <div class="d-flex justify-content-between flex-wrap gap-2">
+                                            <strong>{{ item.date }}</strong>
+                                            <span class="badge bg-light text-dark">
+                                                {{ item.topic }}
+                                            </span>
+                                        </div>
+                                        <p class="mb-0 mt-2">{{ item.tasks }}</p>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </section>
+                {% endif %}
+
+                <!-- Explain and summarize results -->
+                {% if result %}
+                    <section class="card output-card shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white fw-bold">
+                            ✨ Generated Study Notes
+                        </div>
+                        <div class="card-body p-4">
+                            <div class="d-flex justify-content-end flex-wrap gap-2 mb-3 export-actions">
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm"
+                                    id="copy-button"
+                                >
+                                    📋 Copy Output
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-success btn-sm"
+                                    id="download-button"
+                                >
+                                    ⬇ Download Notes
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-danger btn-sm export-button"
+                                    data-format="pdf"
+                                >
+                                    Download PDF
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-primary btn-sm export-button"
+                                    data-format="docx"
+                                >
+                                    Download Word
+                                </button>
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary btn-sm bookmark-button"
+                                    data-kind="note"
+                                    data-title="Saved study notes"
+                                >
+                                    ☆ Bookmark Notes
+                                </button>
+                            </div>
+                            <div class="voice-output-controls">
+                                <button type="button" class="btn btn-outline-primary btn-sm" id="read-aloud-button">
+                                    🔊 Read aloud
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="stop-reading-button" disabled>
+                                    ■ Stop
+                                </button>
+                                <span id="voice-output-status" class="voice-status" role="status" aria-live="polite"></span>
+                            </div>
+                            <div class="ai-output" id="ai-output">{{ result }}</div>
+                        </div>
+                    </section>
+                {% endif %}
+
+                {% if plan_data or quiz_data or flashcards_data or topic_cards_data %}
+                    <div class="d-flex justify-content-end gap-2 mb-4 export-actions">
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary btn-sm bookmark-button"
+                            data-kind="note"
+                            data-title="Saved study material"
+                        >
+                            ☆ Bookmark this study material
+                        </button>
+                    </div>
+                {% endif %}
+            </main>
+
+            <!-- Study history, quiz progress, and saved bookmarks -->
+            <aside class="col-lg-4 app-sidebar">
+                <section class="card sidebar-widget history-widget mb-4">
+                    <div class="card-header bg-secondary text-white fw-bold">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <span>📜 Recent Study History</span>
+                            <button
+                                type="button"
+                                class="btn btn-sm btn-light"
+                                id="clear-history-button"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if history %}
+                            <ul class="list-group list-group-flush">
+                                {% for session in history %}
+                                    <li class="list-group-item p-3">
+                                        <span class="badge bg-info text-dark">
+                                            {{ session.get_task_type_display }}
+                                        </span>
+                                        <small class="text-muted float-end">
+                                            {{ session.created_at|date:"M d, H:i" }}
+                                        </small>
+                                        <p class="mb-0 mt-2 fw-semibold history-text">
+                                            {{ session.user_input|truncatechars:100 }}
+                                        </p>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p class="p-3 text-muted mb-0 text-center">
+                                No history saved yet.
+                            </p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="card sidebar-widget progress-widget mb-4">
+                    <div class="card-header bg-success text-white fw-bold">
+                        📈 Quiz Progress
+                    </div>
+                    <div class="card-body">
+                        {% if progress %}
+                            {% for attempt in progress %}
+                                <div class="mb-3">
+                                    <div class="d-flex justify-content-between gap-2 small mb-1">
+                                        <span class="text-truncate">
+                                            {{ attempt.topic|truncatechars:32 }}
+                                        </span>
+                                        <span>
+                                            {{ attempt.score }}/{{ attempt.total }} · {{ attempt.percent }}%
+                                        </span>
+                                    </div>
+                                    <div class="score-track">
+                                        <div
+                                            class="score-fill"
+                                            style="width: {{ attempt.percent }}%"
+                                        ></div>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ attempt.created_at|date:"M d, Y H:i" }}
+                                    </small>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-muted mb-0">
+                                Complete a quiz to start tracking your scores.
+                            </p>
+                        {% endif %}
+                    </div>
+                </section>
+
+                <section class="card sidebar-widget bookmarks-widget">
+                    <div class="card-header bg-warning fw-bold">⭐ Bookmarks</div>
+                    <div class="card-body p-0">
+                        <ul class="list-group list-group-flush" id="bookmark-list">
+                            {% for bookmark in bookmarks %}
+                                <li
+                                    class="list-group-item p-3"
+                                    data-bookmark-id="{{ bookmark.id }}"
+                                >
+                                    <div class="d-flex justify-content-between gap-2">
+                                        <strong class="history-text">{{ bookmark.title }}</strong>
+                                        <button
+                                            type="button"
+                                            class="btn btn-sm btn-outline-danger delete-bookmark"
+                                            aria-label="Remove bookmark"
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                    <small class="text-muted">
+                                        {{ bookmark.get_kind_display }} · {{ bookmark.created_at|date:"M d, H:i" }}
+                                    </small>
+                                    <details class="mt-2">
+                                        <summary>View</summary>
+                                        <div class="bookmark-content small mt-2">{{ bookmark.content }}</div>
+                                    </details>
+                                </li>
+                            {% empty %}
+                                <li
+                                    class="list-group-item text-muted text-center"
+                                    id="empty-bookmarks"
+                                >
+                                    No bookmarks saved yet.
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </section>
+            </aside>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+    <script src="{% static 'assistant/script.js' %}" defer></script>
+</body>
+</html>
